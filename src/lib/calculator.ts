@@ -42,6 +42,15 @@ export function estimateWeightFromDiameter(
   return area * thicknessFactor
 }
 
+export function estimateWeightFromSquare(
+  widthCm: number,
+  heightCm: number,
+  thicknessFactor: number,
+): number {
+  const area = Math.max(widthCm, 0) * Math.max(heightCm, 0)
+  return area * thicknessFactor
+}
+
 export function deriveTotalWeight(inputs: DoughInputs): number {
   if (inputs.mode === 'diameter') {
     return (

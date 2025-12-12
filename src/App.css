@@ -62,8 +62,20 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: 1.1fr 1fr 1fr 1fr;
   gap: 16px;
+}
+
+@media (max-width: 1600px) {
+  .layout {
+    grid-template-columns: 1.1fr 1fr 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .panel {

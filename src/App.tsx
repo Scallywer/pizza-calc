@@ -7,8 +7,11 @@ import {
   formatGrams,
   suggestYeastPercent,
   estimateBakeMinutes,
+  estimateWeightFromDiameter,
+  estimateWeightFromSquare,
 } from './lib/calculator'
 import type { DoughMode, DoughInputs, YeastType } from './lib/calculator'
+import { calculateTimeline, formatDuration as formatDurationUtil } from './lib/timeline'
 import { usePersistentState } from './lib/storage'
 
 const defaultPreset = DOUGH_PRESETS[0]
@@ -47,12 +50,32 @@ function App() {
     'dough:include-sugar',
     true,
   )
+  const [timelineMode, setTimelineMode] = usePersistentState<'time' | 'duration'>(
+    'dough:timeline-mode',
+    'time',
+  )
+  const [timelineStartHours, setTimelineStartHours] = usePersistentState<number>(
+    'dough:timeline-start-hours',
+    0,
+  )
   const [fermentTempC, setFermentTempC] = usePersistentState<number>(
     'dough:ferment-temp',
     20,
   )
-  const [targetHours, setTargetHours] = usePersistentState<number>(
-    'dough:target-hours',
+  const [useAutolyse, setUseAutolyse] = usePersistentState<boolean>(
+    'dough:use-autolyse',
+    false,
+  )
+  const [autolyseMinutes, setAutolyseMinutes] = usePersistentState<number>(
+    'dough:autolyse-minutes',
+    30,
+  )
+  const [bulkFermentHours, setBulkFermentHours] = usePersistentState<number>(
+    'dough:bulk-ferment-hours',
+    2,
+  )
+  const [finalProofHours, setFinalProofHours] = usePersistentState<number>(
+    'dough:final-proof-hours',
     1,
   )
 
@@ -79,10 +102,10 @@ function App() {
     () =>
       suggestYeastPercent({
         basePercent: preset.yeastPercent,
-        targetHours,
+        targetHours: bulkFermentHours + finalProofHours,
         tempC: fermentTempC,
       }),
-    [fermentTempC, preset.yeastPercent, targetHours],
+    [fermentTempC, preset.yeastPercent, bulkFermentHours, finalProofHours],
   )
 
   const inputs = useMemo<DoughInputs>(
@@ -122,6 +145,54 @@ function App() {
     [maxOvenTempC, preset.ovenTempC],
   )
   const bakeMinutes = estimateBakeMinutes(effectiveOvenTemp, preset.thicknessFactor)
+
+  // Calculate timeline
+  const timeline = useMemo(() => {
+    const startTime = new Date()
+    if (timelineMode === 'time' && timelineStartHours > 0) {
+      startTime.setHours(startTime.getHours() + timelineStartHours)
+    }
+    return calculateTimeline(
+      {
+        useAutolyse,
+        autolyseMinutes,
+        bulkFermentHours,
+        finalProofHours,
+        fermentTempC,
+        flourGrams: formatGrams(breakdown.flour),
+        waterGrams: formatGrams(breakdown.water),
+        includeSugar,
+        pizzaCount,
+        effectiveOvenTemp,
+        bakeMinutes,
+      },
+      startTime
+    )
+  }, [
+    useAutolyse,
+    autolyseMinutes,
+    bulkFermentHours,
+    finalProofHours,
+    fermentTempC,
+    breakdown.flour,
+    breakdown.water,
+    includeSugar,
+    pizzaCount,
+    effectiveOvenTemp,
+    bakeMinutes,
+    timelineMode,
+    timelineStartHours,
+  ])
+
+  const formatTime = (date: Date): string => {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+  }
+
+  const formatDuration = formatDurationUtil
 
   return (
     <div className="page">
@@ -254,20 +325,69 @@ function App() {
             </label>
 
             <label className="field">
-              <span className="label">Target rise time (hours)</span>
+              <span className="label">Use autolyse</span>
+              <button
+                type="button"
+                className={useAutolyse ? 'pill-option active' : 'pill-option'}
+                onClick={() => setUseAutolyse(!useAutolyse)}
+                style={{ width: '100%' }}
+              >
+                Autolyse
+              </button>
+              {useAutolyse && (
+                <>
+                  <select
+                    className="input"
+                    value={autolyseMinutes}
+                    onChange={(e) => setAutolyseMinutes(Number(e.target.value))}
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    {[20, 30, 45, 60].map((mins) => (
+                      <option key={mins} value={mins}>
+                        {mins} minutes
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              <small className="muted">
+                Rest flour + water before adding salt/yeast for better gluten development
+              </small>
+            </label>
+
+            <label className="field">
+              <span className="label">Bulk fermentation (hours)</span>
               <select
                 className="input"
-                value={targetHours}
-                onChange={(e) => setTargetHours(Number(e.target.value))}
+                value={bulkFermentHours}
+                onChange={(e) => setBulkFermentHours(Number(e.target.value))}
               >
-                {[1, 2, 4, 8, 16, 24].map((hours) => (
+                {[0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24].map((hours) => (
                   <option key={hours} value={hours}>
                     {hours}h
                   </option>
                 ))}
               </select>
               <small className="muted">
-                Shorter time → more yeast. Presets vary by style.
+                First rise after mixing, before dividing into balls
+              </small>
+            </label>
+
+            <label className="field">
+              <span className="label">Final proof (hours)</span>
+              <select
+                className="input"
+                value={finalProofHours}
+                onChange={(e) => setFinalProofHours(Number(e.target.value))}
+              >
+                {[0.5, 1, 2, 3, 4, 6, 8, 12, 24].map((hours) => (
+                  <option key={hours} value={hours}>
+                    {hours}h
+                  </option>
+                ))}
+              </select>
+              <small className="muted">
+                Final rise after shaping, before baking
               </small>
             </label>
 
@@ -312,20 +432,15 @@ function App() {
             </label>
 
             <label className="field">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <input
-                  type="checkbox"
-                  checked={includeSugar}
-                  onChange={(e) => setIncludeSugar(e.target.checked)}
-                  style={{ 
-                    width: '1.25rem', 
-                    height: '1.25rem', 
-                    cursor: 'pointer',
-                    accentColor: '#646cff'
-                  }}
-                />
-                <span className="label">Include sugar</span>
-              </div>
+              <span className="label">Include sugar</span>
+              <button
+                type="button"
+                className={includeSugar ? 'pill-option active' : 'pill-option'}
+                onClick={() => setIncludeSugar(!includeSugar)}
+                style={{ width: '100%' }}
+              >
+                Sugar
+              </button>
               <small className="muted">
                 Sugar helps with browning and fermentation. Preset: {preset.sugarPercent}%
               </small>
@@ -389,6 +504,183 @@ function App() {
                 <span>{formatGrams(value as number)} g</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="section-header">
+            <div>
+              <p className="label">Timeline</p>
+              <h2>Step-by-step schedule</h2>
+              <p className="muted">
+                {timelineMode === 'time' 
+                  ? `Start ${timelineStartHours === 0 ? 'now' : `in ${timelineStartHours}h`} to have pizza ready at ${formatTime(timeline[timeline.length - 1]?.time)}`
+                  : `Total time: ${formatDuration(timeline[0]?.time, timeline[timeline.length - 1]?.time)}`
+                }
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              {timelineMode === 'time' && (
+                <select
+                  className="input"
+                  value={timelineStartHours}
+                  onChange={(e) => setTimelineStartHours(Number(e.target.value))}
+                  style={{ width: '140px', fontSize: '0.875rem' }}
+                >
+                  <option value={0}>Start now</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
+                    <option key={hours} value={hours}>
+                      In {hours}h
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="pill-toggle">
+                <button
+                  type="button"
+                  className={timelineMode === 'time' ? 'pill-option active' : 'pill-option'}
+                  onClick={() => setTimelineMode('time')}
+                >
+                  Time
+                </button>
+                <button
+                  type="button"
+                  className={timelineMode === 'duration' ? 'pill-option active' : 'pill-option'}
+                  onClick={() => setTimelineMode('duration')}
+                >
+                  Duration
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {timeline.map((step, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: '#0b1426',
+                  border: '1px solid #243040',
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: timelineMode === 'duration' ? '100px' : '80px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: '#1e293b',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#f8fafc',
+                  }}
+                >
+                  {timelineMode === 'time'
+                    ? formatTime(step.time)
+                    : index === 0
+                    ? 'Now'
+                    : formatDuration(timeline[0].time, step.time)
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', marginBottom: '4px', color: '#f8fafc' }}>
+                    {step.label}
+                  </div>
+                  <div style={{ color: '#cbd5e1', fontSize: '0.9rem' }}>
+                    {step.description}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="section-header">
+            <div>
+              <p className="label">Reference</p>
+              <h2>Dough Ball Weight Guide</h2>
+              <p className="muted">Recommended weights by pizza size/style</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {[
+              { size: '26 cm', diameterCm: 26, isSquare: false },
+              { size: '28 cm', diameterCm: 28, isSquare: false },
+              { size: '30 cm', diameterCm: 30, isSquare: false },
+              { size: '32 cm', diameterCm: 32, isSquare: false },
+              { size: '35 cm', diameterCm: 35, isSquare: false },
+              { size: '40 cm', diameterCm: 40, isSquare: false },
+              { size: '30×40 cm', widthCm: 30, heightCm: 40, isSquare: true },
+            ].map((item) => {
+              const weights = DOUGH_PRESETS.slice(0, 6).map((p) => ({
+                style: p.name,
+                weight: formatGrams(
+                  item.isSquare
+                    ? estimateWeightFromSquare(item.widthCm!, item.heightCm!, p.thicknessFactor)
+                    : estimateWeightFromDiameter(item.diameterCm!, p.thicknessFactor)
+                ),
+              }))
+              const minWeight = Math.min(...weights.map((w) => w.weight))
+              const maxWeight = Math.max(...weights.map((w) => w.weight))
+
+              return (
+                <div
+                  key={item.size}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#0b1426',
+                    border: '1px solid #243040',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', color: '#f8fafc' }}>{item.size}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                      {minWeight}–{maxWeight}g
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    {weights.map(({ style, weight }) => (
+                      <div
+                        key={style}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          background: '#0f172a',
+                          border: '1px solid #1e293b',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ color: '#cbd5e1', fontSize: '0.75rem', marginBottom: '2px' }}>
+                          {style}
+                        </div>
+                        <div style={{ color: '#60a5fa', fontWeight: '600' }}>{weight}g</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
       </main>
