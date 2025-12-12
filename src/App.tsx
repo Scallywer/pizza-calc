@@ -8,7 +8,7 @@ import {
   suggestYeastPercent,
   estimateBakeMinutes,
 } from './lib/calculator'
-import type { DoughMode } from './lib/calculator'
+import type { DoughMode, YeastType } from './lib/calculator'
 import { usePersistentState } from './lib/storage'
 
 const defaultPreset = DOUGH_PRESETS[0]
@@ -35,7 +35,7 @@ function App() {
     'dough:hydration',
     defaultPreset.defaultHydration,
   )
-  const [yeastType, setYeastType] = usePersistentState(
+  const [yeastType, setYeastType] = usePersistentState<YeastType>(
     'dough:yeast',
     'active-dry',
   )
@@ -235,7 +235,7 @@ function App() {
               <select
                 className="input"
                 value={yeastType}
-                onChange={(e) => setYeastType(e.target.value)}
+                onChange={(e) => setYeastType(e.target.value as YeastType)}
               >
                 {yeastOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>

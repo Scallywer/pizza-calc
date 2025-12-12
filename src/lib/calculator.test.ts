@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   computeDough,
   deriveTotalWeight,
-  DoughInputs,
   estimateWeightFromDiameter,
   formatGrams,
   estimateBakeMinutes,
   suggestYeastPercent,
 } from './calculator'
+import type { DoughInputs } from './calculator'
 
 const baseInputs: DoughInputs = {
   mode: 'weight',
