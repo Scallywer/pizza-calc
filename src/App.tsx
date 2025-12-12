@@ -609,21 +609,24 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { size: '26 cm', diameterCm: 26, isSquare: false },
-              { size: '28 cm', diameterCm: 28, isSquare: false },
-              { size: '30 cm', diameterCm: 30, isSquare: false },
-              { size: '32 cm', diameterCm: 32, isSquare: false },
-              { size: '35 cm', diameterCm: 35, isSquare: false },
-              { size: '40 cm', diameterCm: 40, isSquare: false },
-              { size: '30×40 cm', widthCm: 30, heightCm: 40, isSquare: true },
-            ].map((item) => {
+            {([
+              { size: '26 cm', diameterCm: 26, isSquare: false as const },
+              { size: '28 cm', diameterCm: 28, isSquare: false as const },
+              { size: '30 cm', diameterCm: 30, isSquare: false as const },
+              { size: '32 cm', diameterCm: 32, isSquare: false as const },
+              { size: '35 cm', diameterCm: 35, isSquare: false as const },
+              { size: '40 cm', diameterCm: 40, isSquare: false as const },
+              { size: '30×40 cm', widthCm: 30, heightCm: 40, isSquare: true as const },
+            ] as Array<
+              | { size: string; diameterCm: number; isSquare: false }
+              | { size: string; widthCm: number; heightCm: number; isSquare: true }
+            >).map((item) => {
               const weights = DOUGH_PRESETS.slice(0, 6).map((p) => ({
                 style: p.name,
                 weight: formatGrams(
                   item.isSquare
-                    ? estimateWeightFromSquare(item.widthCm!, item.heightCm!, p.thicknessFactor)
-                    : estimateWeightFromDiameter(item.diameterCm!, p.thicknessFactor)
+                    ? estimateWeightFromSquare(item.widthCm, item.heightCm, p.thicknessFactor)
+                    : estimateWeightFromDiameter(item.diameterCm, p.thicknessFactor)
                 ),
               }))
               const minWeight = Math.min(...weights.map((w) => w.weight))
