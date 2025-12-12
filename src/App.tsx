@@ -8,7 +8,7 @@ import {
   suggestYeastPercent,
   estimateBakeMinutes,
 } from './lib/calculator'
-import type { DoughMode, YeastType } from './lib/calculator'
+import type { DoughMode, DoughInputs, YeastType } from './lib/calculator'
 import { usePersistentState } from './lib/storage'
 
 const defaultPreset = DOUGH_PRESETS[0]
@@ -81,7 +81,7 @@ function App() {
     [fermentTempC, preset.yeastPercent, targetHours],
   )
 
-  const inputs = useMemo(
+  const inputs = useMemo<DoughInputs>(
     () => ({
       mode,
       pizzaCount,
@@ -92,7 +92,7 @@ function App() {
       oilPercent: preset.oilPercent,
       sugarPercent: preset.sugarPercent,
       yeastPercent: suggestedYeast,
-      yeastType,
+      yeastType: yeastType as YeastType,
       thicknessFactor: preset.thicknessFactor,
     }),
     [
