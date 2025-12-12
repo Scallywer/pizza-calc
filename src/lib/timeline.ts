@@ -12,16 +12,39 @@ export interface TimelineInputs {
   fermentTempC: number
   flourGrams: number
   waterGrams: number
+  saltGrams: number
+  yeastGrams: number
   includeSugar: boolean
   pizzaCount: number
   effectiveOvenTemp: number
   bakeMinutes: number
 }
 
+export interface TimelineTranslations {
+  stepMix: string
+  stepAutolyse: string
+  stepBulkFerment: string
+  stepDivide: string
+  stepFinalProof: string
+  stepBake: string
+  stepMixDesc: (params: { flour: number; water: number; salt: number; yeast: number; additions: string }) => string
+  stepAutolyseDesc: string
+  stepBulkFermentDesc: (params: { temp: number }) => string
+  stepDivideDesc: (params: { count: number; plural: string }) => string
+  stepFinalProofDesc: (params: { temp: number }) => string
+  stepBakeDesc: (params: { temp: number; minutes: number }) => string
+  sugar: string
+  oil: string
+}
+
 /**
  * Calculate timeline steps for dough preparation
  */
-export function calculateTimeline(inputs: TimelineInputs, startTime: Date = new Date()): TimelineStep[] {
+export function calculateTimeline(
+  inputs: TimelineInputs,
+  startTime: Date = new Date(),
+  t: TimelineTranslations
+): TimelineStep[] {
   const steps: TimelineStep[] = []
   let currentTime = new Date(startTime)
 
@@ -29,20 +52,34 @@ export function calculateTimeline(inputs: TimelineInputs, startTime: Date = new 
   if (inputs.useAutolyse) {
     steps.push({
       time: new Date(currentTime),
-      label: 'Start autolyse',
-      description: `Mix flour (${inputs.flourGrams}g) + water (${inputs.waterGrams}g). Let rest.`,
+      label: t.stepAutolyse,
+      description: t.stepAutolyseDesc,
     })
     currentTime = new Date(currentTime.getTime() + inputs.autolyseMinutes * 60000)
+    const additions = (inputs.includeSugar ? `, ${t.sugar}` : '') + `, ${t.oil}`
     steps.push({
       time: new Date(currentTime),
-      label: 'End autolyse',
-      description: 'Add salt, yeast, oil' + (inputs.includeSugar ? ', sugar' : '') + '. Mix until smooth.',
+      label: t.stepMix,
+      description: t.stepMixDesc({
+        flour: inputs.flourGrams,
+        water: inputs.waterGrams,
+        salt: inputs.saltGrams,
+        yeast: inputs.yeastGrams,
+        additions,
+      }),
     })
   } else {
+    const additions = (inputs.includeSugar ? `, ${t.sugar}` : '') + `, ${t.oil}`
     steps.push({
       time: new Date(currentTime),
-      label: 'Mix dough',
-      description: `Combine all ingredients. Mix until smooth and elastic.`,
+      label: t.stepMix,
+      description: t.stepMixDesc({
+        flour: inputs.flourGrams,
+        water: inputs.waterGrams,
+        salt: inputs.saltGrams,
+        yeast: inputs.yeastGrams,
+        additions,
+      }),
     })
   }
 
@@ -50,16 +87,36 @@ export function calculateTimeline(inputs: TimelineInputs, startTime: Date = new 
   currentTime = new Date(currentTime.getTime() + inputs.bulkFermentHours * 3600000)
   steps.push({
     time: new Date(currentTime),
-    label: 'End bulk fermentation',
-    description: `Ferment at ${inputs.fermentTempC}°C. Dough should rise ~50-75%. Divide into ${inputs.pizzaCount} ball${inputs.pizzaCount > 1 ? 's' : ''} and shape.`,
+    label: t.stepBulkFerment,
+    description: t.stepBulkFermentDesc({ temp: inputs.fermentTempC }),
   })
 
-  // Step 3: Final proof
+  // Step 3: Divide
+  steps.push({
+    time: new Date(currentTime),
+    label: t.stepDivide,
+    description: t.stepDivideDesc({
+      count: inputs.pizzaCount,
+      plural: inputs.pizzaCount > 1 ? 'i' : 'u',
+    }),
+  })
+
+  // Step 4: Final proof
   currentTime = new Date(currentTime.getTime() + inputs.finalProofHours * 3600000)
   steps.push({
     time: new Date(currentTime),
-    label: 'Ready to bake',
-    description: `Final proof complete. Preheat oven to ${inputs.effectiveOvenTemp}°C. Bake for ~${Math.ceil(inputs.bakeMinutes)} minutes.`,
+    label: t.stepFinalProof,
+    description: t.stepFinalProofDesc({ temp: inputs.fermentTempC }),
+  })
+
+  // Step 5: Bake
+  steps.push({
+    time: new Date(currentTime),
+    label: t.stepBake,
+    description: t.stepBakeDesc({
+      temp: inputs.effectiveOvenTemp,
+      minutes: Math.ceil(inputs.bakeMinutes),
+    }),
   })
 
   return steps

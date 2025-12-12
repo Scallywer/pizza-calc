@@ -10,16 +10,36 @@ const baseInputs: TimelineInputs = {
   fermentTempC: 20,
   flourGrams: 500,
   waterGrams: 325,
+  saltGrams: 12,
+  yeastGrams: 2,
   includeSugar: true,
   pizzaCount: 2,
   effectiveOvenTemp: 250,
   bakeMinutes: 12,
 }
 
+const mockTranslations = {
+  stepMix: 'Mix dough',
+  stepAutolyse: 'Start autolyse',
+  stepBulkFerment: 'End bulk fermentation',
+  stepDivide: 'Divide & shape',
+  stepFinalProof: 'Final proof',
+  stepBake: 'Bake',
+  stepMixDesc: (params: { flour: number; water: number; salt: number; yeast: number; additions: string }) =>
+    `Combine ${params.flour}g flour, ${params.water}g water, ${params.salt}g salt, ${params.yeast}g yeast${params.additions}`,
+  stepAutolyseDesc: 'Rest flour and water only',
+  stepBulkFermentDesc: (params: { temp: number }) => `First rise at ${params.temp}°C`,
+  stepDivideDesc: (params: { count: number; plural: string }) => `Divide into ${params.count} ball${params.plural}`,
+  stepFinalProofDesc: (params: { temp: number }) => `Second rise at ${params.temp}°C`,
+  stepBakeDesc: (params: { temp: number; minutes: number }) => `Bake at ${params.temp}°C for ${params.minutes} minutes`,
+  sugar: 'sugar',
+  oil: 'oil',
+}
+
 describe('timeline', () => {
   it('calculates timeline without autolyse', () => {
     const startTime = new Date('2024-01-01T10:00:00Z')
-    const steps = calculateTimeline(baseInputs, startTime)
+    const steps = calculateTimeline(baseInputs, startTime, mockTranslations)
 
     expect(steps).toHaveLength(3)
     expect(steps[0].label).toBe('Mix dough')
@@ -39,7 +59,7 @@ describe('timeline', () => {
       autolyseMinutes: 30,
     }
     const startTime = new Date('2024-01-01T10:00:00Z')
-    const steps = calculateTimeline(inputs, startTime)
+    const steps = calculateTimeline(inputs, startTime, mockTranslations)
 
     expect(steps).toHaveLength(4)
     expect(steps[0].label).toBe('Start autolyse')
@@ -60,7 +80,7 @@ describe('timeline', () => {
       useAutolyse: true,
       includeSugar: true,
     }
-    const steps = calculateTimeline(inputs)
+    const steps = calculateTimeline(inputs, new Date(), mockTranslations)
     const endAutolyseStep = steps.find((s) => s.label === 'End autolyse')
     expect(endAutolyseStep?.description).toContain('sugar')
   })
@@ -71,7 +91,7 @@ describe('timeline', () => {
       useAutolyse: true,
       includeSugar: false,
     }
-    const steps = calculateTimeline(inputs)
+    const steps = calculateTimeline(inputs, new Date(), mockTranslations)
     const endAutolyseStep = steps.find((s) => s.label === 'End autolyse')
     expect(endAutolyseStep?.description).not.toContain('sugar')
   })
@@ -81,13 +101,15 @@ describe('timeline', () => {
     
     const shortAutolyse = calculateTimeline(
       { ...baseInputs, useAutolyse: true, autolyseMinutes: 20 },
-      startTime
+      startTime,
+      mockTranslations
     )
     expect(shortAutolyse[1].time.getTime()).toBe(startTime.getTime() + 20 * 60000)
 
     const longAutolyse = calculateTimeline(
       { ...baseInputs, useAutolyse: true, autolyseMinutes: 60 },
-      startTime
+      startTime,
+      mockTranslations
     )
     expect(longAutolyse[1].time.getTime()).toBe(startTime.getTime() + 60 * 60000)
   })
@@ -95,53 +117,61 @@ describe('timeline', () => {
   it('handles different bulk fermentation times', () => {
     const startTime = new Date('2024-01-01T10:00:00Z')
     
-    const shortBulk = calculateTimeline(
-      { ...baseInputs, bulkFermentHours: 1 },
-      startTime
-    )
-    expect(shortBulk[1].time.getTime()).toBe(startTime.getTime() + 1 * 3600000)
+      const shortBulk = calculateTimeline(
+        { ...baseInputs, bulkFermentHours: 1 },
+        startTime,
+        mockTranslations
+      )
+      expect(shortBulk[1].time.getTime()).toBe(startTime.getTime() + 1 * 3600000)
 
-    const longBulk = calculateTimeline(
-      { ...baseInputs, bulkFermentHours: 8 },
-      startTime
-    )
+      const longBulk = calculateTimeline(
+        { ...baseInputs, bulkFermentHours: 8 },
+        startTime,
+        mockTranslations
+      )
     expect(longBulk[1].time.getTime()).toBe(startTime.getTime() + 8 * 3600000)
   })
 
   it('handles different final proof times', () => {
     const startTime = new Date('2024-01-01T10:00:00Z')
     
-    const shortProof = calculateTimeline(
-      { ...baseInputs, finalProofHours: 0.5 },
-      startTime
-    )
-    const totalTime = shortProof[shortProof.length - 1].time.getTime() - startTime.getTime()
-    expect(totalTime).toBe(2.5 * 3600000) // 2h bulk + 0.5h proof
+      const shortProof = calculateTimeline(
+        { ...baseInputs, finalProofHours: 0.5 },
+        startTime,
+        mockTranslations
+      )
+      const totalTime = shortProof[shortProof.length - 1].time.getTime() - startTime.getTime()
+      expect(totalTime).toBe(2.5 * 3600000) // 2h bulk + 0.5h proof
 
-    const longProof = calculateTimeline(
-      { ...baseInputs, finalProofHours: 24 },
-      startTime
-    )
+      const longProof = calculateTimeline(
+        { ...baseInputs, finalProofHours: 24 },
+        startTime,
+        mockTranslations
+      )
     const totalTimeLong = longProof[longProof.length - 1].time.getTime() - startTime.getTime()
     expect(totalTimeLong).toBe(26 * 3600000) // 2h bulk + 24h proof
   })
 
   it('includes correct pizza count in description', () => {
-    const singlePizza = calculateTimeline({ ...baseInputs, pizzaCount: 1 })
+    const singlePizza = calculateTimeline({ ...baseInputs, pizzaCount: 1 }, new Date(), mockTranslations)
     const singleStep = singlePizza.find((s) => s.label === 'End bulk fermentation')
     expect(singleStep?.description).toContain('1 ball')
 
-    const multiplePizza = calculateTimeline({ ...baseInputs, pizzaCount: 4 })
+    const multiplePizza = calculateTimeline({ ...baseInputs, pizzaCount: 4 }, new Date(), mockTranslations)
     const multipleStep = multiplePizza.find((s) => s.label === 'End bulk fermentation')
     expect(multipleStep?.description).toContain('4 balls')
   })
 
   it('includes oven temp and bake time in final step', () => {
-    const steps = calculateTimeline({
-      ...baseInputs,
-      effectiveOvenTemp: 300,
-      bakeMinutes: 8.5,
-    })
+    const steps = calculateTimeline(
+      {
+        ...baseInputs,
+        effectiveOvenTemp: 300,
+        bakeMinutes: 8.5,
+      },
+      new Date(),
+      mockTranslations
+    )
     const finalStep = steps[steps.length - 1]
     expect(finalStep.description).toContain('300°C')
     expect(finalStep.description).toContain('9 minutes') // rounded up
@@ -176,7 +206,7 @@ describe('timeline', () => {
   describe('getTotalDuration', () => {
     it('calculates total duration correctly', () => {
       const startTime = new Date('2024-01-01T10:00:00Z')
-      const steps = calculateTimeline(baseInputs, startTime)
+      const steps = calculateTimeline(baseInputs, startTime, mockTranslations)
       const total = getTotalDuration(steps)
       
       // 2h bulk + 1h proof = 180 minutes
@@ -187,7 +217,8 @@ describe('timeline', () => {
       const startTime = new Date('2024-01-01T10:00:00Z')
       const steps = calculateTimeline(
         { ...baseInputs, useAutolyse: true, autolyseMinutes: 30 },
-        startTime
+        startTime,
+        mockTranslations
       )
       const total = getTotalDuration(steps)
       

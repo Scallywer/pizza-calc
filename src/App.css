@@ -62,19 +62,29 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 1fr 1fr;
   gap: 16px;
 }
 
+.layout.show-reference {
+  grid-template-columns: 1fr 1.1fr 1fr 1fr;
+}
+
+.layout:not(.show-reference) {
+  grid-template-columns: 1.1fr 1fr 1fr;
+}
+
 @media (max-width: 1600px) {
-  .layout {
+  .layout.show-reference {
+    grid-template-columns: 1fr 1.1fr 1fr;
+  }
+  .layout:not(.show-reference) {
     grid-template-columns: 1.1fr 1fr 1fr;
   }
 }
 
 @media (max-width: 1200px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 }
 

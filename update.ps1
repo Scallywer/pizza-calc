@@ -18,3 +18,4 @@ Write-Host "Update complete!" -ForegroundColor Green
 # Show current image
 docker images ghcr.io/scallywer/pizza-calc:latest --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}"
 
+

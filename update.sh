@@ -20,3 +20,4 @@ echo "Update complete!"
 # Show current image
 docker images ghcr.io/scallywer/pizza-calc:latest --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}"
 
+

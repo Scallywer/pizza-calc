@@ -13,6 +13,7 @@ import {
 import type { DoughMode, DoughInputs, YeastType } from './lib/calculator'
 import { calculateTimeline, formatDuration as formatDurationUtil } from './lib/timeline'
 import { usePersistentState } from './lib/storage'
+import { getTranslations, t, type Language } from './lib/translations'
 
 const defaultPreset = DOUGH_PRESETS[0]
 
@@ -58,6 +59,12 @@ function App() {
     'dough:timeline-start-hours',
     0,
   )
+  const [showReference, setShowReference] = usePersistentState<boolean>(
+    'dough:show-reference',
+    true,
+  )
+  const [language, setLanguage] = usePersistentState<Language>('dough:language', 'en')
+  const translations = getTranslations(language)
   const [fermentTempC, setFermentTempC] = usePersistentState<number>(
     'dough:ferment-temp',
     20,
@@ -161,12 +168,33 @@ function App() {
         fermentTempC,
         flourGrams: formatGrams(breakdown.flour),
         waterGrams: formatGrams(breakdown.water),
+        saltGrams: formatGrams(breakdown.salt),
+        yeastGrams: formatGrams(breakdown.yeast),
         includeSugar,
         pizzaCount,
         effectiveOvenTemp,
         bakeMinutes,
       },
-      startTime
+      startTime,
+      {
+        stepMix: translations.stepMix,
+        stepAutolyse: translations.stepAutolyse,
+        stepBulkFerment: translations.stepBulkFerment,
+        stepDivide: translations.stepDivide,
+        stepFinalProof: translations.stepFinalProof,
+        stepBake: translations.stepBake,
+        stepMixDesc: (params) => t(language, 'stepMixDesc', params),
+        stepAutolyseDesc: translations.stepAutolyseDesc,
+        stepBulkFermentDesc: (params) => t(language, 'stepBulkFermentDesc', params),
+        stepDivideDesc: (params) => {
+          const plural = params.count > 1 ? (language === 'hr' ? 'i' : 's') : (language === 'hr' ? 'u' : '')
+          return t(language, 'stepDivideDesc', { ...params, plural })
+        },
+        stepFinalProofDesc: (params) => t(language, 'stepFinalProofDesc', params),
+        stepBakeDesc: (params) => t(language, 'stepBakeDesc', params),
+        sugar: translations.sugar,
+        oil: translations.oil,
+      }
     )
   }, [
     useAutolyse,
@@ -176,16 +204,20 @@ function App() {
     fermentTempC,
     breakdown.flour,
     breakdown.water,
+    breakdown.salt,
+    breakdown.yeast,
     includeSugar,
     pizzaCount,
     effectiveOvenTemp,
     bakeMinutes,
     timelineMode,
     timelineStartHours,
+    language,
+    translations,
   ])
 
   const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString('en-US', {
+    return date.toLocaleTimeString(language === 'hr' ? 'hr-HR' : 'en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -198,64 +230,180 @@ function App() {
     <div className="page">
       <header className="hero">
         <div>
-          <p className="eyebrow">Pizza & Bread Dough Calculator</p>
-          <h1>Make-anywhere dough with smart presets</h1>
+          <p className="eyebrow">{translations.appTitle}</p>
+          <h1>{translations.appSubtitle}</h1>
           <p className="lede">
-            Start from a classic style, tune hydration, choose yeast and oven,
-            and size by total dough weight or pizza diameter.
+            {translations.appDescription}
           </p>
         </div>
         <div className="hero-meta">
-          <div className="pill">React + Vite • Offline friendly</div>
-          <div className="pill accent">Settings saved locally</div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className={language === 'en' ? 'pill-option active' : 'pill-option'}
+              onClick={() => setLanguage('en')}
+              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={language === 'hr' ? 'pill-option active' : 'pill-option'}
+              onClick={() => setLanguage('hr')}
+              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+            >
+              HR
+            </button>
+          </div>
+          <div className="pill">{translations.pillOffline}</div>
+          <div className="pill accent">{translations.pillSettings}</div>
         </div>
       </header>
 
-      <main className="layout">
+      <main className={`layout ${showReference ? 'show-reference' : ''}`}>
+        {showReference && (
+          <section className="panel">
+            <div className="section-header">
+              <div>
+                <p className="label">{translations.labelReference}</p>
+                <h2>{translations.referenceTitle}</h2>
+                <p className="muted">{translations.referenceSubtitle}</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {([
+                { size: '26 cm', diameterCm: 26, isSquare: false as const },
+                { size: '28 cm', diameterCm: 28, isSquare: false as const },
+                { size: '30 cm', diameterCm: 30, isSquare: false as const },
+                { size: '32 cm', diameterCm: 32, isSquare: false as const },
+                { size: '35 cm', diameterCm: 35, isSquare: false as const },
+                { size: '40 cm', diameterCm: 40, isSquare: false as const },
+                { size: '30×40 cm', widthCm: 30, heightCm: 40, isSquare: true as const },
+              ] as Array<
+                | { size: string; diameterCm: number; isSquare: false }
+                | { size: string; widthCm: number; heightCm: number; isSquare: true }
+              >).map((item) => {
+                const weights = DOUGH_PRESETS.slice(0, 6).map((p) => ({
+                  style: p.name,
+                  weight: formatGrams(
+                    item.isSquare
+                      ? estimateWeightFromSquare(item.widthCm, item.heightCm, p.thicknessFactor)
+                      : estimateWeightFromDiameter(item.diameterCm, p.thicknessFactor)
+                  ),
+                }))
+                const minWeight = Math.min(...weights.map((w) => w.weight))
+                const maxWeight = Math.max(...weights.map((w) => w.weight))
+
+                return (
+                  <div
+                    key={item.size}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '12px',
+                      background: '#0b1426',
+                      border: '1px solid #243040',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', color: '#f8fafc' }}>{item.size}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                        {minWeight}–{maxWeight}g
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '6px',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      {weights.map(({ style, weight }) => (
+                        <div
+                          key={style}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            background: '#0f172a',
+                            border: '1px solid #1e293b',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ color: '#cbd5e1', fontSize: '0.75rem', marginBottom: '2px' }}>
+                            {style}
+                          </div>
+                          <div style={{ color: '#60a5fa', fontWeight: '600' }}>{weight}g</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
         <section className="panel">
           <div className="section-header">
             <div>
-              <p className="label">Preset</p>
+              <p className="label">{translations.labelPreset}</p>
               <h2>{preset.name}</h2>
               <p className="muted">{preset.description}</p>
             </div>
-            <select
-              className="input"
-              value={presetId}
-              onChange={(e) => setPresetId(e.target.value)}
-            >
-              {DOUGH_PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              <button
+                type="button"
+                className={showReference ? 'pill-option active' : 'pill-option'}
+                onClick={() => setShowReference(!showReference)}
+                style={{ width: '140px', fontSize: '0.875rem' }}
+              >
+                {showReference ? translations.hideReference : translations.showReference}
+              </button>
+              <select
+                className="input"
+                value={presetId}
+                onChange={(e) => setPresetId(e.target.value)}
+              >
+                {DOUGH_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="grid">
             <label className="field">
-              <span className="label">Mode</span>
+              <span className="label">{translations.labelMode}</span>
               <div className="pill-toggle">
                 <button
                   type="button"
                   className={mode === 'weight' ? 'pill-option active' : 'pill-option'}
                   onClick={() => setMode('weight')}
                 >
-                  Total dough (g)
+                  {translations.modeWeight}
                 </button>
                 <button
                   type="button"
                   className={mode === 'diameter' ? 'pill-option active' : 'pill-option'}
                   onClick={() => setMode('diameter')}
                 >
-                  Pizza diameter
+                  {translations.modeDiameter}
                 </button>
               </div>
             </label>
 
             {mode === 'weight' ? (
               <label className="field">
-                <span className="label">Total dough weight (g)</span>
+                <span className="label">{translations.labelTotalDoughWeight}</span>
                 <input
                   className="input"
                   type="number"
@@ -269,7 +417,7 @@ function App() {
             ) : (
               <>
                 <label className="field">
-                  <span className="label">Number of pizzas</span>
+                  <span className="label">{translations.labelPizzaCount}</span>
                   <input
                     className="input"
                     type="number"
@@ -279,7 +427,7 @@ function App() {
                   />
                 </label>
                 <label className="field">
-                  <span className="label">Pizza diameter (cm)</span>
+                  <span className="label">{translations.labelPizzaDiameter}</span>
                   <input
                     className="input"
                     type="number"
@@ -294,7 +442,7 @@ function App() {
             )}
 
             <label className="field">
-              <span className="label">Hydration (%)</span>
+              <span className="label">{translations.labelHydration}</span>
               <input
                 className="input"
                 type="number"
@@ -303,11 +451,11 @@ function App() {
                 value={hydration}
                 onChange={(e) => setHydration(Math.max(Number(e.target.value) || 0, 0))}
               />
-              <small className="muted">Preset default: {preset.defaultHydration}%</small>
+              <small className="muted">{t(language, 'helpPresetDefault', { percent: preset.defaultHydration.toString() })}</small>
             </label>
 
             <label className="field">
-              <span className="label">Yeast type</span>
+              <span className="label">{translations.labelYeastType}</span>
               <select
                 className="input"
                 value={yeastType}
@@ -320,19 +468,19 @@ function App() {
                 ))}
               </select>
               <small className="muted">
-                Base yeast: {preset.yeastPercent}% of flour (adjusted by type)
+                {t(language, 'helpBaseYeast', { percent: preset.yeastPercent.toString() })}
               </small>
             </label>
 
             <label className="field">
-              <span className="label">Use autolyse</span>
+              <span className="label">{translations.labelUseAutolyse}</span>
               <button
                 type="button"
                 className={useAutolyse ? 'pill-option active' : 'pill-option'}
                 onClick={() => setUseAutolyse(!useAutolyse)}
                 style={{ width: '100%' }}
               >
-                Autolyse
+                {translations.labelAutolyse}
               </button>
               {useAutolyse && (
                 <>
@@ -344,19 +492,17 @@ function App() {
                   >
                     {[20, 30, 45, 60].map((mins) => (
                       <option key={mins} value={mins}>
-                        {mins} minutes
+                        {mins} {translations.minutes}
                       </option>
                     ))}
                   </select>
                 </>
               )}
-              <small className="muted">
-                Rest flour + water before adding salt/yeast for better gluten development
-              </small>
+              <small className="muted">{translations.helpAutolyse}</small>
             </label>
 
             <label className="field">
-              <span className="label">Bulk fermentation (hours)</span>
+              <span className="label">{translations.labelBulkFerment}</span>
               <select
                 className="input"
                 value={bulkFermentHours}
@@ -368,31 +514,27 @@ function App() {
                   </option>
                 ))}
               </select>
-              <small className="muted">
-                First rise after mixing, before dividing into balls
-              </small>
+              <small className="muted">{translations.helpBulkFerment}</small>
             </label>
 
             <label className="field">
-              <span className="label">Final proof (hours)</span>
+              <span className="label">{translations.labelTargetRiseTime}</span>
               <select
                 className="input"
                 value={finalProofHours}
                 onChange={(e) => setFinalProofHours(Number(e.target.value))}
               >
-                {[0.5, 1, 2, 3, 4, 6, 8, 12, 24].map((hours) => (
+                {[1, 2, 4, 8, 16, 24].map((hours) => (
                   <option key={hours} value={hours}>
                     {hours}h
                   </option>
                 ))}
               </select>
-              <small className="muted">
-                Final rise after shaping, before baking
-              </small>
+              <small className="muted">{translations.helpRiseTime}</small>
             </label>
 
             <label className="field">
-              <span className="label">Fermentation temp (°C)</span>
+              <span className="label">{translations.labelFermentTemp}</span>
               <select
                 className="input"
                 value={fermentTempC}
@@ -404,14 +546,10 @@ function App() {
                   </option>
                 ))}
               </select>
-              <small className="muted">
-                Colder (fridge) needs more yeast; warmer needs less.
-              </small>
             </label>
 
-
             <label className="field">
-              <span className="label">My oven max (°C)</span>
+              <span className="label">{translations.labelMaxOvenTemp}</span>
               <select
                 className="input"
                 value={maxOvenTempC}
@@ -426,23 +564,20 @@ function App() {
                   </option>
                 ))}
               </select>
-              <small className="muted">
-                Actual bake temp = min(preset {preset.ovenTempC} °C, max {maxOvenTempC} °C)
-              </small>
             </label>
 
             <label className="field">
-              <span className="label">Include sugar</span>
+              <span className="label">{translations.labelIncludeSugar}</span>
               <button
                 type="button"
                 className={includeSugar ? 'pill-option active' : 'pill-option'}
                 onClick={() => setIncludeSugar(!includeSugar)}
                 style={{ width: '100%' }}
               >
-                Sugar
+                {translations.sugar}
               </button>
               <small className="muted">
-                Sugar helps with browning and fermentation. Preset: {preset.sugarPercent}%
+                {t(language, 'helpSugar', { percent: preset.sugarPercent.toString() })}
               </small>
             </label>
           </div>
@@ -451,53 +586,53 @@ function App() {
         <section className="panel results">
           <div className="section-header">
             <div>
-              <p className="label">Results</p>
-              <h2>Ingredient breakdown</h2>
+              <p className="label">{translations.labelResults}</p>
+              <h2>{translations.labelIngredients}</h2>
               <p className="muted">
-                Adjust hydration, yeast type, and sizing to see updated weights.
+                {translations.resultsDescription}
               </p>
             </div>
             <div className="stat">
-              <span className="label">Total dough</span>
+              <span className="label">{translations.totalDough}</span>
               <strong>{formatGrams(totalWeight)} g</strong>
               <span className="muted">
-                {formatGrams(breakdown.perBall)} g per pizza
+                {formatGrams(breakdown.perBall)} g {translations.perBall}
               </span>
             </div>
           </div>
 
           <div className="metrics">
             <div className="metric">
-              <span className="label">Hydration</span>
+              <span className="label">{translations.labelHydration}</span>
               <strong>{hydration}%</strong>
             </div>
             <div className="metric">
-              <span className="label">Oven temp</span>
+              <span className="label">{translations.labelOvenTemp}</span>
               <strong>
                 {effectiveOvenTemp} °C{' '}
-                {effectiveOvenTemp < preset.ovenTempC ? '(capped)' : ''}
+                {effectiveOvenTemp < preset.ovenTempC ? translations.labelCapped : ''}
               </strong>
             </div>
             <div className="metric">
-              <span className="label">Bake time (est)</span>
-              <strong>{Math.ceil(bakeMinutes)} min</strong>
+              <span className="label">{translations.bakeTime}</span>
+              <strong>{Math.ceil(bakeMinutes)} {translations.minutes}</strong>
             </div>
           </div>
 
           <div className="table">
             <div className="table-row header">
-              <span>Ingredient</span>
-              <span>Grams</span>
+              <span>{translations.labelIngredients}</span>
+              <span>{translations.labelGrams}</span>
             </div>
             {[
-              ['Flour', breakdown.flour],
-              ['Water', breakdown.water],
-              ['Salt', breakdown.salt],
-              ['Oil', breakdown.oil],
+              [translations.flour, breakdown.flour],
+              [translations.water, breakdown.water],
+              [translations.salt, breakdown.salt],
+              [translations.oil, breakdown.oil],
               ...(includeSugar && breakdown.sugar > 0
-                ? [['Sugar', breakdown.sugar]]
+                ? [[translations.sugar, breakdown.sugar]]
                 : []),
-              ['Yeast', breakdown.yeast],
+              [translations.yeast, breakdown.yeast],
             ].map(([name, value]) => (
               <div key={name} className="table-row">
                 <span>{name}</span>
@@ -510,12 +645,12 @@ function App() {
         <section className="panel">
           <div className="section-header">
             <div>
-              <p className="label">Timeline</p>
-              <h2>Step-by-step schedule</h2>
+              <p className="label">{translations.labelTimeline}</p>
+              <h2>{translations.timelineTitle}</h2>
               <p className="muted">
                 {timelineMode === 'time' 
-                  ? `Start ${timelineStartHours === 0 ? 'now' : `in ${timelineStartHours}h`} to have pizza ready at ${formatTime(timeline[timeline.length - 1]?.time)}`
-                  : `Total time: ${formatDuration(timeline[0]?.time, timeline[timeline.length - 1]?.time)}`
+                  ? `${timelineStartHours === 0 ? translations.timelineStartNow : t(language, 'timelineStartIn', { hours: timelineStartHours.toString() })} ${translations.timelineToHaveReady} ${formatTime(timeline[timeline.length - 1]?.time)}`
+                  : `${translations.timelineTotalTime} ${formatDuration(timeline[0]?.time, timeline[timeline.length - 1]?.time)}`
                 }
               </p>
             </div>
@@ -527,10 +662,10 @@ function App() {
                   onChange={(e) => setTimelineStartHours(Number(e.target.value))}
                   style={{ width: '140px', fontSize: '0.875rem' }}
                 >
-                  <option value={0}>Start now</option>
+                  <option value={0}>{translations.timelineStartNow}</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
                     <option key={hours} value={hours}>
-                      In {hours}h
+                      {t(language, 'timelineStartIn', { hours: hours.toString() })}
                     </option>
                   ))}
                 </select>
@@ -541,14 +676,14 @@ function App() {
                   className={timelineMode === 'time' ? 'pill-option active' : 'pill-option'}
                   onClick={() => setTimelineMode('time')}
                 >
-                  Time
+                  {translations.timelineModeTime}
                 </button>
                 <button
                   type="button"
                   className={timelineMode === 'duration' ? 'pill-option active' : 'pill-option'}
                   onClick={() => setTimelineMode('duration')}
                 >
-                  Duration
+                  {translations.timelineModeDuration}
                 </button>
               </div>
             </div>
@@ -582,7 +717,7 @@ function App() {
                   {timelineMode === 'time'
                     ? formatTime(step.time)
                     : index === 0
-                    ? 'Now'
+                    ? translations.now
                     : formatDuration(timeline[0].time, step.time)
                   }
                 </div>
@@ -596,94 +731,6 @@ function App() {
                 </div>
               </div>
             ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-header">
-            <div>
-              <p className="label">Reference</p>
-              <h2>Dough Ball Weight Guide</h2>
-              <p className="muted">Recommended weights by pizza size/style</p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {([
-              { size: '26 cm', diameterCm: 26, isSquare: false as const },
-              { size: '28 cm', diameterCm: 28, isSquare: false as const },
-              { size: '30 cm', diameterCm: 30, isSquare: false as const },
-              { size: '32 cm', diameterCm: 32, isSquare: false as const },
-              { size: '35 cm', diameterCm: 35, isSquare: false as const },
-              { size: '40 cm', diameterCm: 40, isSquare: false as const },
-              { size: '30×40 cm', widthCm: 30, heightCm: 40, isSquare: true as const },
-            ] as Array<
-              | { size: string; diameterCm: number; isSquare: false }
-              | { size: string; widthCm: number; heightCm: number; isSquare: true }
-            >).map((item) => {
-              const weights = DOUGH_PRESETS.slice(0, 6).map((p) => ({
-                style: p.name,
-                weight: formatGrams(
-                  item.isSquare
-                    ? estimateWeightFromSquare(item.widthCm, item.heightCm, p.thicknessFactor)
-                    : estimateWeightFromDiameter(item.diameterCm, p.thicknessFactor)
-                ),
-              }))
-              const minWeight = Math.min(...weights.map((w) => w.weight))
-              const maxWeight = Math.max(...weights.map((w) => w.weight))
-
-              return (
-                <div
-                  key={item.size}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '12px',
-                    background: '#0b1426',
-                    border: '1px solid #243040',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '8px',
-                    }}
-                  >
-                    <div style={{ fontWeight: '600', color: '#f8fafc' }}>{item.size}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                      {minWeight}–{maxWeight}g
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '6px',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    {weights.map(({ style, weight }) => (
-                      <div
-                        key={style}
-                        style={{
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          background: '#0f172a',
-                          border: '1px solid #1e293b',
-                          textAlign: 'center',
-                        }}
-                      >
-                        <div style={{ color: '#cbd5e1', fontSize: '0.75rem', marginBottom: '2px' }}>
-                          {style}
-                        </div>
-                        <div style={{ color: '#60a5fa', fontWeight: '600' }}>{weight}g</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </section>
       </main>
