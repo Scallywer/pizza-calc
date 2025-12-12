@@ -43,6 +43,10 @@ function App() {
     'dough:max-oven-temp',
     300,
   )
+  const [includeSugar, setIncludeSugar] = usePersistentState<boolean>(
+    'dough:include-sugar',
+    true,
+  )
   const [fermentTempC, setFermentTempC] = usePersistentState<number>(
     'dough:ferment-temp',
     20,
@@ -81,8 +85,6 @@ function App() {
     [fermentTempC, preset.yeastPercent, targetHours],
   )
 
-  const typedYeastType: YeastType = yeastType as YeastType
-  
   const inputs = useMemo<DoughInputs>(
     () => ({
       mode,
@@ -92,9 +94,9 @@ function App() {
       hydrationPercent: hydration,
       saltPercent: preset.saltPercent,
       oilPercent: preset.oilPercent,
-      sugarPercent: preset.sugarPercent,
+      sugarPercent: includeSugar ? preset.sugarPercent : 0,
       yeastPercent: suggestedYeast,
-      yeastType: typedYeastType,
+      yeastType: yeastType as YeastType,
       thicknessFactor: preset.thicknessFactor,
     }),
     [
@@ -107,6 +109,7 @@ function App() {
       preset.oilPercent,
       preset.sugarPercent,
       preset.thicknessFactor,
+      includeSugar,
       suggestedYeast,
       yeastType,
     ],
@@ -307,6 +310,21 @@ function App() {
                 Actual bake temp = min(preset {preset.ovenTempC} °C, max {maxOvenTempC} °C)
               </small>
             </label>
+
+            <label className="field">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={includeSugar}
+                  onChange={(e) => setIncludeSugar(e.target.checked)}
+                  style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                />
+                <span className="label">Include sugar</span>
+              </div>
+              <small className="muted">
+                Sugar helps with browning and fermentation. Preset: {preset.sugarPercent}%
+              </small>
+            </label>
           </div>
         </section>
 
@@ -356,7 +374,9 @@ function App() {
               ['Water', breakdown.water],
               ['Salt', breakdown.salt],
               ['Oil', breakdown.oil],
-              ['Sugar', breakdown.sugar],
+              ...(includeSugar && breakdown.sugar > 0
+                ? [['Sugar', breakdown.sugar]]
+                : []),
               ['Yeast', breakdown.yeast],
             ].map(([name, value]) => (
               <div key={name} className="table-row">
