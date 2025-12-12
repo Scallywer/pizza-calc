@@ -312,12 +312,17 @@ function App() {
             </label>
 
             <label className="field">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <input
                   type="checkbox"
                   checked={includeSugar}
                   onChange={(e) => setIncludeSugar(e.target.checked)}
-                  style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                  style={{ 
+                    width: '1.25rem', 
+                    height: '1.25rem', 
+                    cursor: 'pointer',
+                    accentColor: '#646cff'
+                  }}
                 />
                 <span className="label">Include sugar</span>
               </div>
