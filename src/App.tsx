@@ -81,6 +81,8 @@ function App() {
     [fermentTempC, preset.yeastPercent, targetHours],
   )
 
+  const typedYeastType: YeastType = yeastType as YeastType
+  
   const inputs = useMemo<DoughInputs>(
     () => ({
       mode,
@@ -92,7 +94,7 @@ function App() {
       oilPercent: preset.oilPercent,
       sugarPercent: preset.sugarPercent,
       yeastPercent: suggestedYeast,
-      yeastType: yeastType as YeastType,
+      yeastType: typedYeastType,
       thicknessFactor: preset.thicknessFactor,
     }),
     [
