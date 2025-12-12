@@ -2,6 +2,8 @@
 
 A React + TypeScript + Vite web app for calculating pizza and bread dough ingredients with presets for famous styles, adjustable hydration, yeast type, and oven temperature.
 
+**Repository:** https://github.com/Scallywer/pizza-calc
+
 ## Features
 
 - Multiple pizza style presets (Neapolitan, New York, Detroit, Sicilian, Roman, Focaccia, Sourdough, Grandma)
