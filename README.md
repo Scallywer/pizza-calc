@@ -28,13 +28,34 @@ npm run build
 
 ## Docker Deployment
 
-### Quick Start
+### Quick Start (Local Build)
 
 ```bash
 docker-compose up -d
 ```
 
-The app will be available on port 8080 (or whatever port you configure in `docker-compose.yml`).
+### Production (Pull from Registry)
+
+**Note:** After the first GitHub Actions run, your image will be at `ghcr.io/scallywer/pizza-calc:latest`
+
+**Option 1: Make package public (easiest)**
+- Go to https://github.com/Scallywer/pizza-calc/packages
+- Click on the package → Package settings → Change visibility to Public
+- No authentication needed
+
+**Option 2: Use private package (requires auth)**
+Create a Personal Access Token (PAT) with `read:packages` permission:
+```bash
+docker login ghcr.io -u Scallywer
+# Enter your PAT when prompted
+```
+
+Then use the production compose file:
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+The app will be available on port 8080 (or whatever port you configure).
 
 ### HAProxy Configuration
 
@@ -71,10 +92,46 @@ backend pizza_backend
 
 ### Updating
 
+**Manual Update:**
 ```bash
 docker-compose down
-docker-compose build --no-cache
+docker-compose pull
 docker-compose up -d
+```
+
+**Automatic Updates (Recommended for Homelab):**
+
+Option 1: Use Watchtower (Auto-updates all containers)
+```bash
+# Install watchtower once
+docker run -d \
+  --name watchtower \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  containrrr/watchtower \
+  --interval 3600 \
+  pizza-dough-calc
+```
+
+Option 2: GitHub Actions + Webhook (Update on commit)
+- The GitHub Actions workflow automatically builds and pushes to `ghcr.io`
+- Set up a webhook receiver on your homelab to pull and restart on new images
+- Or use a scheduled cron job to check for updates
+
+Option 3: Update script (included in repo)
+```bash
+# Linux/Mac
+chmod +x update.sh
+./update.sh
+
+# Windows PowerShell
+.\update.ps1
+```
+
+Set up a cron job (Linux) or Task Scheduler (Windows) to run automatically:
+```bash
+# Linux cron example (check every hour)
+0 * * * * /path/to/pizza-calc/update.sh >> /var/log/pizza-calc-update.log 2>&1
 ```
 
 ---
